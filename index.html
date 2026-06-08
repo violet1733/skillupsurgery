@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surgical Skills Log</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 15px; max-width: 500px; margin: auto; background: #f4f4f9; }
+        .input-section { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .time-inputs { display: flex; gap: 10px; }
+        button { width: 100%; padding: 15px; background: #28a745; color: white; border: none; border-radius: 5px; font-weight: bold; margin-top: 10px; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: white; font-size: 0.9em; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+
+    <h2>ペグトランスファー記録</h2>
+
+    <div class="input-section">
+        <input type="text" id="nickname" placeholder="ニックネーム">
+        <input type="datetime-local" id="datetime">
+        <div class="time-inputs">
+            <input type="number" id="min" placeholder="分" inputmode="decimal">
+            <input type="number" id="sec" placeholder="秒" inputmode="decimal">
+        </div>
+        <button onclick="addRecord()">記録する</button>
+    </div>
+
+    <canvas id="myChart"></canvas>
+
+    <h3>ランキング（上位）</h3>
+    <table>
+        <thead><tr><th>順位</th><th>名前</th><th>タイム</th></tr></thead>
+        <tbody id="rank-table"></tbody>
+    </table>
+
+    <h3>記録一覧（全履歴）</h3>
+    <table>
+        <thead><tr><th>日時</th><th>名前</th><th>タイム</th></tr></thead>
+        <tbody id="list-table"></tbody>
+    </table>
+
+    <script>
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('datetime').value = now.toISOString().slice(0, 16);
+
+        let records = JSON.parse(localStorage.getItem('surgicalRecords')) || [];
+        document.getElementById('nickname').value = localStorage.getItem('lastNickname') || '';
+
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'タイム推移(秒)', data: [], borderColor: '#28a745' }] }
+        });
+
+        function addRecord() {
+            const nickname = document.getElementById('nickname').value || "匿名";
+            const datetime = document.getElementById('datetime').value.slice(5, 16).replace('T', ' ');
+            const min = parseInt(document.getElementById('min').value) || 0;
+            const sec = parseInt(document.getElementById('sec').value) || 0;
+            const totalSec = (min * 60) + sec;
+
+            if (totalSec === 0) return alert("タイムを入力してください");
+
+            records.push({ name: nickname, time: totalSec, date: datetime });
+            localStorage.setItem('surgicalRecords', JSON.stringify(records));
+            localStorage.setItem('lastNickname', nickname);
+            updateUI();
+        }
+
+        function updateUI() {
+            // グラフ更新
+            myChart.data.labels = records.map(r => r.date);
+            myChart.data.datasets[0].data = records.map(r => r.time);
+            myChart.update();
+
+            // ランキング更新（速い順）
+            const sorted = [...records].sort((a, b) => a.time - b.time);
+            document.getElementById('rank-table').innerHTML = sorted.slice(0, 5).map((r, i) => 
+                `<tr><td>${i + 1}位</td><td>${r.name}</td><td>${r.time}秒</td></tr>`
+            ).join('');
+
+            // 全履歴リスト更新（新しい順）
+            document.getElementById('list-table').innerHTML = [...records].reverse().map(r => 
+                `<tr><td>${r.date}</td><td>${r.name}</td><td>${r.time}秒</td></tr>`
+            ).join('');
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
